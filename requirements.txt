@@ -3,3 +3,4 @@ uvicorn[standard]
 baostock
 pandas
 numpy
+requests

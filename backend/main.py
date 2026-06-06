@@ -73,6 +73,44 @@ def analyze_symbol(
     return result
 
 
+@app.get("/api/confluence/{symbol}")
+def get_confluence(symbol: str):
+    symbol = symbol.strip().zfill(6)
+    results = {}
+    for iv in ["1d", "1h", "1min"]:
+        try:
+            df = dp.get_stock_data(symbol, interval=iv)
+            min_bars = 30 if iv != "1d" else 60
+            if df is None or len(df) < min_bars:
+                results[iv] = None
+                continue
+            a = ind.analyze(df, interval=iv)
+            results[iv] = {
+                "trend":    a["signals"].get("trend",    {}),
+                "macd":     a["signals"].get("macd",     {}),
+                "rsi":      a["signals"].get("rsi",      {}),
+                "kdj":      a["signals"].get("kdj",      {}),
+                "bull_pct": a["bull_pct"],
+                "score":    round(sum(s["score"] for s in a["signals"].values()), 1),
+            }
+        except Exception:
+            results[iv] = None
+
+    valid = [v for v in results.values() if v is not None]
+    if len(valid) >= 2:
+        dirs = [1 if v["score"] > 0 else (-1 if v["score"] < 0 else 0) for v in valid]
+        if all(d > 0 for d in dirs):
+            confluence = "bullish"
+        elif all(d < 0 for d in dirs):
+            confluence = "bearish"
+        else:
+            confluence = "mixed"
+    else:
+        confluence = "mixed"
+
+    return {"intervals": results, "confluence": confluence}
+
+
 # ── Serve frontend ────────────────────────────────────────────────────────────
 frontend_dir = os.path.join(os.path.dirname(__file__), "..", "frontend")
 if os.path.exists(frontend_dir):

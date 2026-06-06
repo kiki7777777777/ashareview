@@ -325,6 +325,12 @@ function renderDashboard(d) {
         <div class="chart-container"><canvas id="kdjCanvas"></canvas></div>
       </div>
 
+      <!-- 多周期共振 -->
+      <div class="card card-confluence">
+        <div class="card-title">多周期共振分析</div>
+        <div id="confluence-content" class="confluence-loading">正在分析三个周期，请稍候…</div>
+      </div>
+
       <!-- 买卖信号 -->
       <div class="card card-trade-signals">
         <div class="card-title" style="margin-bottom:8px">
@@ -365,6 +371,7 @@ function renderDashboard(d) {
 
   buildKlineChart(d);
   buildSubCharts(d);
+  loadConfluence(d.symbol);
   // 开盘时间内自动启动实时刷新
   if (isMarketOpen()) startLive(d.symbol);
 }
@@ -508,6 +515,48 @@ function buildSubCharts(d) {
       },
     },
   });
+}
+
+// ─── 多周期共振 ───────────────────────────────────────────────────────────────
+async function loadConfluence(symbol) {
+  try {
+    const r = await fetch(`${API}/api/confluence/${symbol}`);
+    if (!r.ok) return;
+    renderConfluence(await r.json());
+  } catch { }
+}
+
+function renderConfluence(data) {
+  const el = document.getElementById("confluence-content");
+  if (!el) return;
+
+  const ivNames = { "1d": "日线", "1h": "1小时", "1min": "5分钟" };
+  const sc = v => v === "bullish" ? "var(--bull)" : v === "bearish" ? "var(--bear)" : "var(--neutral)";
+  const ic = v => v === "bullish" ? "▲" : v === "bearish" ? "▼" : "—";
+
+  const cColor = sc(data.confluence);
+  const cLabel = data.confluence === "bullish" ? "三周期共振 · 看涨"
+               : data.confluence === "bearish" ? "三周期共振 · 看跌"
+               : "周期信号分歧 · 观望";
+
+  const rows = Object.entries(data.intervals).map(([iv, info]) => {
+    if (!info) return `<tr><td class="cf-iv">${ivNames[iv]}</td><td colspan="5" style="color:var(--text2);font-size:12px">数据不足</td></tr>`;
+    const cell = (sig) =>
+      `<td style="color:${sc(sig.value)};font-weight:700;font-size:15px">${ic(sig.value)}<div style="font-size:10px;color:var(--text2);font-weight:400">${sig.label ? sig.label.split(" ")[0] : ""}</div></td>`;
+    const scoreColor = info.score > 0 ? "var(--bull)" : info.score < 0 ? "var(--bear)" : "var(--neutral)";
+    return `<tr>
+      <td class="cf-iv">${ivNames[iv]}</td>
+      ${cell(info.trend)} ${cell(info.macd)} ${cell(info.rsi)} ${cell(info.kdj)}
+      <td style="color:${scoreColor};font-weight:700">${info.score > 0 ? "+" : ""}${info.score}</td>
+    </tr>`;
+  }).join("");
+
+  el.innerHTML = `
+    <div class="confluence-result" style="color:${cColor}">${cLabel}</div>
+    <table class="cf-table">
+      <thead><tr><th>周期</th><th>趋势</th><th>MACD</th><th>RSI</th><th>KDJ</th><th>综合分</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
 }
 
 // ─── 工具函数 ─────────────────────────────────────────────────────────────────

@@ -1,5 +1,5 @@
 const API = "";
-let macdChart = null, rsiChart = null;
+let macdChart = null, rsiChart = null, kdjChart = null;
 let klineChart = null, volChart = null, candleSeries = null;
 let currentInterval = "1d";
 let liveTimer = null, liveSymbol = null, liveBarState = null;
@@ -92,6 +92,7 @@ function destroyCharts() {
   stopLive();
   if (macdChart)  { macdChart.destroy();  macdChart = null; }
   if (rsiChart)   { rsiChart.destroy();   rsiChart = null; }
+  if (kdjChart)   { kdjChart.destroy();   kdjChart = null; }
   if (klineChart) { klineChart.remove();  klineChart = null; candleSeries = null; }
   if (volChart)   { volChart.remove();    volChart = null; }
 }
@@ -182,7 +183,7 @@ function renderDashboard(d) {
   const changeC = d.change > 0 ? "var(--bull)" : d.change < 0 ? "var(--bear)" : "var(--text2)";
   const changeSign = d.change > 0 ? "+" : "";
 
-  const sigNames = { macd: "MACD", rsi: "RSI", trend: "趋势", bollinger: "布林带", volume: "量能", momentum: "动量" };
+  const sigNames = { macd: "MACD", rsi: "RSI", kdj: "KDJ", trend: "趋势", bollinger: "布林带", volume: "量能", momentum: "动量" };
   const sigsHtml = Object.entries(d.signals).map(([k, s]) => `
     <div class="signal-item ${s.value}">
       <span class="signal-name">${sigNames[k] || k}</span>
@@ -312,6 +313,16 @@ function renderDashboard(d) {
       <div class="card card-rsi-chart">
         <div class="card-title">RSI 历史 (14)</div>
         <div class="chart-container"><canvas id="rsiCanvas"></canvas></div>
+      </div>
+
+      <!-- KDJ 图 -->
+      <div class="card card-kdj-chart">
+        <div class="card-title">KDJ (9,3,3) &nbsp;
+          <span style="color:#58a6ff">K=${d.kdj_k}</span> &nbsp;
+          <span style="color:#d29922">D=${d.kdj_d}</span> &nbsp;
+          <span style="color:#f472b6">J=${d.kdj_j}</span>
+        </div>
+        <div class="chart-container"><canvas id="kdjCanvas"></canvas></div>
       </div>
 
       <!-- 买卖信号 -->
@@ -474,6 +485,27 @@ function buildSubCharts(d) {
     options: {
       ...base,
       scales: { ...base.scales, y: { ...base.scales.y, min: 0, max: 100, ticks: { color: "#8b949e", font: { size: 11 }, stepSize: 20 } } },
+    },
+  });
+
+  const kdjLabels = d.chart.kdj_k.map(p => fmtT(p.time));
+  kdjChart = new Chart(document.getElementById("kdjCanvas"), {
+    type: "line",
+    data: {
+      labels: kdjLabels,
+      datasets: [
+        { label: "K", data: d.chart.kdj_k.map(p => p.value), borderColor: "#58a6ff", borderWidth: 1.5, pointRadius: 0, fill: false, tension: 0.3 },
+        { label: "D", data: d.chart.kdj_d.map(p => p.value), borderColor: "#d29922", borderWidth: 1.5, pointRadius: 0, fill: false, tension: 0.3 },
+        { label: "J", data: d.chart.kdj_j.map(p => p.value), borderColor: "#f472b6", borderWidth: 1,   pointRadius: 0, fill: false, tension: 0.3 },
+      ],
+    },
+    options: {
+      ...base,
+      plugins: { legend: { display: true, labels: { color: "#8b949e", boxWidth: 12, font: { size: 11 } } } },
+      scales: {
+        x: base.scales.x,
+        y: { ...base.scales.y, ticks: { color: "#8b949e", font: { size: 11 }, stepSize: 20 } },
+      },
     },
   });
 }

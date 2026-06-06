@@ -151,8 +151,9 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, 'S
 
 /* Charts */
 .card-kline        { grid-column: span 12; }
-.card-macd-chart   { grid-column: span 6; }
-.card-rsi-chart    { grid-column: span 6; }
+.card-macd-chart   { grid-column: span 4; }
+.card-rsi-chart    { grid-column: span 4; }
+.card-kdj-chart    { grid-column: span 4; }
 .card-trade-signals{ grid-column: span 4; }
 .card-signals      { grid-column: span 4; }
 .card-ema          { grid-column: span 4; }

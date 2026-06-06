@@ -52,6 +52,18 @@ def calculate_volume_trend(volume, close, period=20):
     return (up_vol / total.replace(0, np.nan)).fillna(0.5)
 
 
+def calculate_kdj(high, low, close, n=9, m1=3, m2=3):
+    """KDJ 随机指标 (A股最常用)"""
+    lowest  = low.rolling(n, min_periods=1).min()
+    highest = high.rolling(n, min_periods=1).max()
+    denom   = (highest - lowest).replace(0, np.nan)
+    rsv     = ((close - lowest) / denom * 100).fillna(50)
+    k = rsv.ewm(com=m1 - 1, adjust=False).mean()
+    d = k.ewm(com=m2 - 1, adjust=False).mean()
+    j = 3 * k - 2 * d
+    return k, d, j
+
+
 def calculate_vwap(high, low, close, volume):
     tp = (high + low + close) / 3
     return (tp * volume).cumsum() / volume.cumsum().replace(0, np.nan)
@@ -126,6 +138,7 @@ def analyze(df: pd.DataFrame, interval: str = "1d") -> dict:
     ema20       = calculate_ema(close, 20)
     ema50       = calculate_ema(close, 50)
     ema200      = calculate_ema(close, 200)
+    kdj_k, kdj_d, kdj_j = calculate_kdj(high, low, close)
 
     latest         = close.iloc[-1]
     latest_rsi     = rsi.iloc[-1]
@@ -139,6 +152,11 @@ def analyze(df: pd.DataFrame, interval: str = "1d") -> dict:
     latest_ema20   = ema20.iloc[-1]
     latest_ema50   = ema50.iloc[-1]
     latest_ema200  = ema200.iloc[-1]
+    latest_k       = kdj_k.iloc[-1]
+    latest_d       = kdj_d.iloc[-1]
+    latest_j       = kdj_j.iloc[-1]
+    prev_k         = kdj_k.iloc[-2]
+    prev_d         = kdj_d.iloc[-2]
 
     # 今日涨跌幅
     if "pct_chg" in df.columns:
@@ -212,6 +230,22 @@ def analyze(df: pd.DataFrame, interval: str = "1d") -> dict:
     else:
         signals["momentum"] = {"value": "neutral",  "label": "动量中性", "score": 0}
 
+    # KDJ signal
+    if latest_j < 20:
+        signals["kdj"] = {"value": "bullish", "label": f"KDJ 超卖区 (J={latest_j:.1f})", "score": 1}
+    elif latest_j > 80:
+        signals["kdj"] = {"value": "bearish", "label": f"KDJ 超买区 (J={latest_j:.1f})", "score": -1}
+    elif latest_k > latest_d and prev_k <= prev_d:
+        signals["kdj"] = {"value": "bullish", "label": f"KDJ 金叉 (K={latest_k:.1f})", "score": 0.7}
+    elif latest_k < latest_d and prev_k >= prev_d:
+        signals["kdj"] = {"value": "bearish", "label": f"KDJ 死叉 (K={latest_k:.1f})", "score": -0.7}
+    elif latest_k > 50:
+        signals["kdj"] = {"value": "bullish", "label": f"KDJ 偏强 (K={latest_k:.1f})", "score": 0.3}
+    elif latest_k < 50:
+        signals["kdj"] = {"value": "bearish", "label": f"KDJ 偏弱 (K={latest_k:.1f})", "score": -0.3}
+    else:
+        signals["kdj"] = {"value": "neutral",  "label": f"KDJ 中性 (K={latest_k:.1f})", "score": 0}
+
     total_score = sum(s["score"] for s in signals.values())
     max_score   = len(signals)
     bull_pct    = max(0.0, min(1.0, (total_score + max_score) / (2 * max_score)))
@@ -281,6 +315,9 @@ def analyze(df: pd.DataFrame, interval: str = "1d") -> dict:
         "macd":          round(latest_macd, 4),
         "macd_signal":   round(latest_signal, 4),
         "macd_hist":     round(latest_hist, 4),
+        "kdj_k":         round(latest_k, 1),
+        "kdj_d":         round(latest_d, 1),
+        "kdj_j":         round(latest_j, 1),
         "trend":         trend_label,
         "bull_pct":      round(bull_pct * 100, 1),
         "signals":       signals,
@@ -302,6 +339,9 @@ def analyze(df: pd.DataFrame, interval: str = "1d") -> dict:
             "macd_signal": series(signal_line),
             "macd_hist":   macd_hist_series(),
             "rsi":         series(rsi, decimals=1),
+            "kdj_k":       series(kdj_k, decimals=1),
+            "kdj_d":       series(kdj_d, decimals=1),
+            "kdj_j":       series(kdj_j, decimals=1),
             "vwap":        series(vwap, decimals=2),
         },
         "ema": {

@@ -12,14 +12,12 @@ app = FastAPI(title="A股量化仪表盘")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 DEFAULT_SYMBOLS = [
-    {"code": "600519", "name": "贵州茅台"},
-    {"code": "300750", "name": "宁德时代"},
-    {"code": "002594", "name": "比亚迪"},
-    {"code": "601318", "name": "中国平安"},
-    {"code": "000858", "name": "五粮液"},
-    {"code": "600036", "name": "招商银行"},
-    {"code": "000001", "name": "平安银行"},
-    {"code": "688981", "name": "中芯国际"},
+    {"code": "300308", "name": "中际旭创"},
+    {"code": "300806", "name": "斯迪克"},
+    {"code": "601138", "name": "工业富联"},
+    {"code": "300394", "name": "天孚通信"},
+    {"code": "002741", "name": "光华科技"},
+    {"code": "603063", "name": "禾望电气"},
 ]
 
 

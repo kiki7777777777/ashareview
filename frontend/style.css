@@ -207,3 +207,16 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, 'S
 .ema-rel.below { background: var(--bear-dim); color: var(--bear); }
 
 .error-box { grid-column: span 12; background: var(--bull-dim); border: 1px solid var(--bull); border-radius: var(--radius); padding: 20px; color: var(--bull); }
+
+/* 实时 LIVE 角标 */
+.live-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: var(--bull); color: #fff;
+  font-size: 11px; font-weight: 700; letter-spacing: .5px;
+  padding: 3px 10px; border-radius: 20px;
+  animation: livepulse 1.2s ease-in-out infinite;
+}
+@keyframes livepulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: .55; }
+}

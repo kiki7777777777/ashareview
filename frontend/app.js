@@ -2,6 +2,7 @@ const API = "";
 let macdChart = null, rsiChart = null;
 let klineChart = null, volChart = null, candleSeries = null;
 let currentInterval = "1d";
+let liveTimer = null, liveSymbol = null, liveBarState = null;
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 window.addEventListener("DOMContentLoaded", () => {
@@ -87,10 +88,83 @@ function showError(msg) {
     `<div class="dashboard"><div class="error-box">❌ ${msg}</div></div>`;
 }
 function destroyCharts() {
+  stopLive();
   if (macdChart)  { macdChart.destroy();  macdChart = null; }
   if (rsiChart)   { rsiChart.destroy();   rsiChart = null; }
   if (klineChart) { klineChart.remove();  klineChart = null; candleSeries = null; }
   if (volChart)   { volChart.remove();    volChart = null; }
+}
+
+// ─── 实时行情刷新 ─────────────────────────────────────────────────────────────
+function startLive(symbol) {
+  stopLive();
+  liveSymbol   = symbol;
+  liveBarState = null;
+  tickLive();                              // 立即第一次
+  liveTimer = setInterval(tickLive, 3000); // 之后每3秒
+}
+
+function stopLive() {
+  if (liveTimer) { clearInterval(liveTimer); liveTimer = null; }
+  const badge = document.getElementById("live-badge");
+  if (badge) badge.style.display = "none";
+}
+
+async function tickLive() {
+  if (!liveSymbol) return;
+  try {
+    const r = await fetch(`${API}/api/quote/${liveSymbol}`);
+    if (!r.ok) return;
+    const q = await r.json();
+    if (!q.price || !q.date) return;
+
+    // ── 更新顶部价格 ───────────────────────────────────────────────────
+    const priceEl   = document.querySelector(".price-value");
+    const changeEl  = document.querySelector(".price-change");
+    const change2El = document.querySelectorAll(".price-change")[1];
+    if (priceEl)   priceEl.textContent = `¥${q.price.toFixed(2)}`;
+    if (changeEl) {
+      const sign = q.pct_chg >= 0 ? "+" : "";
+      changeEl.style.color = q.pct_chg >= 0 ? "var(--bull)" : "var(--bear)";
+      changeEl.textContent = `${sign}${q.pct_chg}% 今日`;
+    }
+
+    // ── 更新 LIVE 角标 ─────────────────────────────────────────────────
+    const badge = document.getElementById("live-badge");
+    if (badge) {
+      badge.style.display = "inline-flex";
+      badge.textContent   = `● LIVE  ${q.time}`;
+    }
+
+    // ── 更新 K 线最后一根 ──────────────────────────────────────────────
+    if (!candleSeries) return;
+
+    if (currentInterval === "1d") {
+      // 日线：直接用今日行情更新当天那根K线
+      candleSeries.update({
+        time:  q.date,
+        open:  q.open,
+        high:  q.high,
+        low:   q.low,
+        close: q.price,
+      });
+    } else {
+      // 分时：每个周期内自行维护 OHLC，避免 high/low 用整天数据
+      const period = currentInterval === "1h" ? 3600 : 300;
+      const bjMs   = new Date(`${q.date}T${q.time}+08:00`).getTime();
+      const barTs  = Math.floor(bjMs / 1000 / period) * period;
+
+      if (!liveBarState || liveBarState.time !== barTs) {
+        // 新周期开始：以当前价格作为开盘
+        liveBarState = { time: barTs, open: q.price, high: q.price, low: q.price, close: q.price };
+      } else {
+        liveBarState.high  = Math.max(liveBarState.high, q.price);
+        liveBarState.low   = Math.min(liveBarState.low,  q.price);
+        liveBarState.close = q.price;
+      }
+      candleSeries.update(liveBarState);
+    }
+  } catch { /* 静默忽略 */ }
 }
 
 // ─── 渲染仪表盘 ───────────────────────────────────────────────────────────────
@@ -151,7 +225,10 @@ function renderDashboard(d) {
           </div>
         </div>
         <div class="hero-price">
-          <div class="price-value">¥${d.price.toFixed(2)}</div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <div class="price-value">¥${d.price.toFixed(2)}</div>
+            <span id="live-badge" class="live-badge" style="display:none">● LIVE</span>
+          </div>
           <div class="price-change" style="color:${changeC}">${changeSign}${d.change}% 今日</div>
           <div class="price-change" style="color:${changeC};font-size:12px">${d.change_5d > 0 ? "+" : ""}${d.change_5d}% 5日</div>
           <div class="source-badge">数据: ${d.source}</div>
@@ -276,6 +353,8 @@ function renderDashboard(d) {
 
   buildKlineChart(d);
   buildSubCharts(d);
+  // 开盘时间内自动启动实时刷新
+  if (isMarketOpen()) startLive(d.symbol);
 }
 
 // ─── K线图（TradingView Lightweight Charts） ──────────────────────────────────

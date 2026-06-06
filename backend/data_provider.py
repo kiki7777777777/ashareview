@@ -1,5 +1,6 @@
 import baostock as bs
 import pandas as pd
+import requests, re
 from datetime import datetime, timedelta, timezone
 import threading
 import logging
@@ -113,6 +114,44 @@ def get_stock_info(symbol: str) -> dict:
         logger.warning(f"get_stock_info {symbol}: {e}")
         return {"name": symbol, "sector": "", "total_mv": 0, "float_mv": 0,
                 "pe_ratio": None, "pb_ratio": None}
+
+
+def get_realtime_quote(symbol: str) -> dict | None:
+    """从新浪财经拉取实时行情（无需VPN，国内可用）"""
+    code   = symbol.strip().zfill(6)
+    prefix = "sz" if code[0] in ("0", "3") else "sh"
+    url    = f"https://hq.sinajs.cn/list={prefix}{code}"
+    headers = {
+        "Referer":    "https://finance.sina.com.cn/",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+    }
+    try:
+        r = requests.get(url, headers=headers, timeout=6)
+        r.encoding = "gbk"
+        m = re.search(r'"([^"]+)"', r.text)
+        if not m or not m.group(1).strip(","):
+            return None
+        p = m.group(1).split(",")
+        if len(p) < 32 or not p[3]:
+            return None
+        prev  = float(p[2]) if p[2] else 0
+        price = float(p[3]) if p[3] else 0
+        return {
+            "name":       p[0],
+            "open":       float(p[1]) if p[1] else price,
+            "prev_close": prev,
+            "price":      price,
+            "high":       float(p[4]) if p[4] else price,
+            "low":        float(p[5]) if p[5] else price,
+            "volume":     int(p[8])   if p[8]  else 0,
+            "amount":     float(p[9]) if p[9]  else 0,
+            "pct_chg":    round((price - prev) / prev * 100, 2) if prev else 0,
+            "date":       p[30],
+            "time":       p[31],
+        }
+    except Exception as e:
+        logger.warning(f"Realtime quote {symbol}: {e}")
+        return None
 
 
 # 登录（进程启动时）

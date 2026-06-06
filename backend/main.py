@@ -26,6 +26,14 @@ def get_status():
     return {"connected": True, "source": "akshare · 东方财富", "message": "数据正常"}
 
 
+@app.get("/api/quote/{symbol}")
+def get_quote(symbol: str):
+    q = dp.get_realtime_quote(symbol.strip().zfill(6))
+    if q is None:
+        raise HTTPException(status_code=404, detail="无法获取实时行情")
+    return q
+
+
 @app.get("/api/symbols")
 def get_symbols():
     return {"symbols": DEFAULT_SYMBOLS}

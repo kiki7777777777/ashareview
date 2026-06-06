@@ -69,8 +69,8 @@ def get_stock_data(symbol: str, interval: str = "1d") -> pd.DataFrame:
     while rs.error_code == "0" and rs.next():
         rows.append(rs.get_row_data())
     df = pd.DataFrame(rows, columns=["date","time","open","high","low","close","volume"])
-    # 合并日期+时间 → 北京时间 datetime
-    df["datetime"] = pd.to_datetime(df["date"] + " " + df["time"].str[:8])
+    # time 格式 "20260604093500000"（YYYYMMDDHHmmss + 毫秒），直接取前14位解析
+    df["datetime"] = pd.to_datetime(df["time"].str[:14], format="%Y%m%d%H%M%S")
     df = df.set_index("datetime")
     for c in ["open","high","low","close","volume"]:
         df[c] = pd.to_numeric(df[c], errors="coerce")

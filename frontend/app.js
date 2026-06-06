@@ -18,16 +18,17 @@ window.addEventListener("DOMContentLoaded", () => {
 });
 
 // ─── 市场状态（北京时间） ──────────────────────────────────────────────────────
+function isMarketOpen() {
+  const bj  = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Shanghai" }));
+  const day = bj.getDay(), t = bj.getHours() * 60 + bj.getMinutes();
+  if (day < 1 || day > 5) return false;
+  return (t >= 570 && t <= 690) || (t >= 780 && t <= 900);
+}
+
 function updateMarketStatus() {
-  const el = document.getElementById("market-status");
-  const bj = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Shanghai" }));
-  const day = bj.getDay(), h = bj.getHours(), m = bj.getMinutes();
-  const t = h * 60 + m;
-  let open = false;
-  if (day >= 1 && day <= 5) {
-    if ((t >= 570 && t <= 690) || (t >= 780 && t <= 900)) open = true;
-  }
-  el.className = "conn-badge " + (open ? "conn-ok" : "conn-off");
+  const el   = document.getElementById("market-status");
+  const open = isMarketOpen();
+  el.className   = "conn-badge " + (open ? "conn-ok" : "conn-off");
   el.textContent = open ? "● 交易中" : "● 已收盘";
 }
 
